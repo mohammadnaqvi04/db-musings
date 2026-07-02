@@ -1,0 +1,4 @@
+src/optimizer/join_order/cost_model.cpp
+
+- This is evaluating JOIN costs as part of a single step of what I think is a graph-based physical(?) query plan evaluator
+- At part of a single node/step of evaluation, we're evaluating the costs of the left and the right of a query plan, then combining it with the cost of joining across both of them and returniing that cost from the ComputeCost method.
