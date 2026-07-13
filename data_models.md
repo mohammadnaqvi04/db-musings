@@ -1,9 +1,9 @@
-- The issue with a flat file storage model is that querying over striaght files makes it unorthodox to verify the integrity of the data you're processing, implementing functions over that model, handling concurrent writers, and persisting it throug failure.
+- The issue with a flat file storage model is that querying over straight files makes it unorthodox to verify the integrity of the data you're processing, implementing functions over that model, handling concurrent writers, and persisting it through failure.
 - Data model = describes the genre of DB (relational, graph, KV, Array). Schema = describes the layout of a DB (fields, their relations, constraints)
 - Codd's relational model proposed that databases should separate the logical layer that developers write from the physical layer an engine actually executes. Developers should be able to write declarative statements of the result they want, leaving the imperative piece to the underlying engine which it can optimize on its own.
 - Two flavors of data manipulation langauges: declarative and procedural/imperative
 - Inner join: return records from both tables where there's a match
-- Left join: return all records from left table + matching records from the right with NULL filling in missing values from the right table
+- Left join: return all records from left table + matching records from the right table with NULL filling in missing values from the right table
 - Right join: return all records from the right table while filling in NULL for missing data in the left record matches
 - Full join: return all records from both sides, filling in missing values with NULL
 - An observation with relational algebra—it allows you to describe a high-level ordering of how to execute a query.  This isn't exactly what the underlying engine should use though, performing a high-pruning filter and then joining with the resulting relation is much more performant than joining two tables expensively and then filtering after the fact.
