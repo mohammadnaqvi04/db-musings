@@ -17,6 +17,14 @@
 - GROUP BY gives a way to partition your query results into multiple groups so that each computation is derived from a specific partition
 - It lets you specify multiple grouping in a single query (and a single pass) as opposed to writing different queries and then performing UNIONs between them
 - The shared SELECT list across different group sets means every row populated by a group set must contain values for those columns. If a group doesn't have a value to semantically fill in for a SELECT column, it's filled in w/ the GROUPING NULL
+- HAVING is used to filter outputs based on an aggregate computation written as part of the query. It functions as a WHERE clause for GROUP BYs
+- Window functions give you GROUP BY functionality without collapsing result rows to support running totals
+- `OVER` and `PARTITION BY` together define the group over which to apply the function preceding `OVER `.
+- `RANK` and `ROW NUMBER` are two ways to enumerate the tuples in a partition, where RANK permits ties and ROW doesn't
+
+
+Nested queries, lateral joins, CTEs
+
 
 
 
