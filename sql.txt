@@ -13,6 +13,15 @@
 - The way around this is a subquery that evaluates the average first
 - In `COUNT(1+1+1) where c.id='519'`, the expr in COUNT has no bearance on the filter being applied. The WHERE clause applies filtering, and then COUNT(expr) returns the # of results that evaluate to non-NULL. Since a constant is never null like in `1+1+1`, all filtered rows contribute to the final count.
 - COUNT(expr) operates on an expression that if is not null, contributes to the count. Unlike with WHERE/HAVING where only NOT NULL && NOT FALSE are both satisfied.
+- LIKE allows for wildcard matching using `%` and `_`
+- GROUP BY gives a way to partition your query results into multiple groups so that each computation is derived from a specific partition
+- It lets you specify multiple grouping in a single query (and a single pass) as opposed to writing different queries and then performing UNIONs between them
+- The shared SELECT list across different group sets means every row populated by a group set must contain values for those columns. If a group doesn't have a value to semantically fill in for a SELECT column, it's filled in w/ the GROUPING NULL
+
+
+
+
+
 
 
 
@@ -24,3 +33,4 @@ Definitions:
 - A primary key specifies a one or more attributes that uniquely identifies a relation
 - A foreign key establishes a cross-table consistency rule. It essentially prevents dangling pointers between tables
 - The form `foreign key (Ak1, Ak2, …, Akn) references s` says that "this foreign key must match the primary key of `s` as a whole"
+- Table vs Index vs View
