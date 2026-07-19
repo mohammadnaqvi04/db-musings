@@ -21,9 +21,9 @@
 - Window functions give you GROUP BY functionality without collapsing result rows to support running totals
 - `OVER` and `PARTITION BY` together define the group over which to apply the function preceding `OVER `.
 - `RANK` and `ROW NUMBER` are two ways to enumerate the tuples in a partition, where RANK permits ties and ROW doesn't
-
-
-Nested queries, lateral joins, CTEs
+- Nested queries are when you compose a query as part of another query. Typically divided into an inner and outer query.
+- The dumb way of executing a nested query is to treat it as a nested for loop, and for every outer record being processed you run the inner query. Ideally you'd want to be able to rewrite a nested query into a join, which a system can then execute much more efficiently
+- Moved to iPad
 
 
 
