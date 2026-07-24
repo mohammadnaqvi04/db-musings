@@ -53,10 +53,43 @@ with
         )
       )
   )
-select
-  t2.nameGiven,
-  t3.teamID
+select distinct
+  t2.nameGiven || '|' || t3.teamID || '|' || c
 from
-  people as t2
+  -- This is to get the count of the # of years a player won Gold Glove, grouped by player.
+  -- This is how you get around the issue of needing to include a SELECT attr in your GROUP BY when
+  -- you have an aggregate in your SELECT
+  -- https://stackoverflow.com/questions/19601948/must-appear-in-the-group-by-clause-or-be-used-in-an-aggregate-function
+  (
+    select
+      t1.playerID,
+      count(t1.yearID) as c
+    from
+      t1
+    group by
+      t1.playerID
+  ) tt
+  join people t2 on tt.playerID = t2.playerID
   join t1 on t2.playerID = t1.playerID
-  join appearances t3 on t3.playerId = t1.playerID
+  -- t1 only gives me the players who won Gold Glove and the years they won it, but there's nothing in there
+  -- that tells me the team they were on when they won it, which I need for the output
+  --
+  -- This necessitates the bottom join, which answers the q of "which team for this player, year combo".
+  -- The issue in doing this without an additional where clause is it'll just give you the records
+  -- from appearances irrespective of the (year, player) combo corresponding to the selection criteria.
+  --
+  -- It's not an unnecessary operation, you genuinely didn't have access to this in t1 and now you need to join
+  -- in order to find it
+  join appearances t3 on t1.playerID = t3.playerID
+where
+  (
+    t1.yearID = t3.yearID
+    and t1.playerID = t3.playerID
+  )
+order by
+  c desc,
+  t2.nameGiven
+limit
+  10;
+
+-- count(t1.yearID) as c
