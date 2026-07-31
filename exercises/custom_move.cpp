@@ -40,7 +40,7 @@ public:
   MyData(const MyData &source) {
 
     // allocate data and perform the copy
-    int *buffer = new int[buffer_size];
+    buffer = new int[buffer_size];
 
     for (int i = 0; i < buffer_size; i++) {
       buffer[i] = source.buffer[i];
@@ -55,7 +55,7 @@ public:
 
   // Destructor
   ~MyData() {
-    // delete[] buffer;
+    delete[] buffer;
     std::cout << "Destructor called" << std::endl;
   }
 };
