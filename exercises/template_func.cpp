@@ -1,18 +1,3 @@
-/*
- * Spec:
- * 1. max_val<T>(T a, T b) - templated function, returns the larger of two
- * values.
- * 2. print_pair<T, U>(T a, U b) - two different template types, prints "a, b".
- * 3. describe<T>() - prints "generic type" for any T, but write a
- * specialization for <int> that prints "int type" instead.
-
- * 4. clamp_or_not<bool Clamp>(int val) - non-type bool template param. If Clamp
- *    is true, clamp val to [0, 100]; if false, return val unchanged.
- *
- * In main(): call each with explicit template args, then call max_val and
- * print_pair once WITHOUT explicit args and confirm the compiler deduces them.
- */
-
 #include <iostream>
 #include <string>
 
