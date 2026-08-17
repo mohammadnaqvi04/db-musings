@@ -66,13 +66,33 @@ I'll then join t6 against teams to get the leagues, and will then project out (l
 
 */
 with
+  active_leagues as ( -- table of active leagues
+    select
+      lgID
+    from
+      leagues
+    where
+      active = 'T'
+  ),
+  active_teams as ( -- You needed these to prevent the join fanout from before
+    select
+      teamID
+    from
+      teams,
+      active_leagues
+    where
+      teams.lgID in active_leagues
+  ),
   t1 as ( --  the table of distinct players grouped by (ID, team, year)
     select distinct
       app.playerID,
       app.teamID,
       app.yearID
     from
-      appearances as app
+      appearances as app,
+      active_teams
+    where
+      app.teamID in active_teams
     group by
       app.playerID,
       app.teamID,
@@ -109,6 +129,8 @@ with
       managers as m
       join awardsmanagers as am on m.playerID = am.playerID
       and m.yearID = am.yearID
+    where
+      m.teamID in active_leagues
   ),
   t5 as ( -- Table of (team, year) tuples where players and managers together satisfy event E
     select
@@ -130,33 +152,37 @@ with
     having
       count(*) > 1
   ),
-  t7 as ( -- the join fanout that's occuring here is because the `teams` table has a row for each year a team player, not a static list of teams
+  t7 as ( -- Table of (teamID, name, year) tuples to map from teamID to name
+    select distinct
+      teamID,
+      name,
+      yearID
+    from
+      teams
+    where
+      teamID in active_leagues
+  ),
+  t8 as ( -- Table of (team_name, count(event E)) tuples
     select
-      teams.lgID as league,
-      teams.name as teamName,
+      t7.name,
       t6.c as count
     from
       t6
-      join teams on t6.teamID = teams.teamID
+      join t7 on t6.teamID = t7.teamID
+  ),
+  t9 as ( -- Final output
+    select
+      leagues.league as league,
+      t8.name,
+      t8.count
+    from
+      t8
+      join leagues on t7.league = leagues.lgID
   )
 select
-  *
+  t8.league || '|' || t8.team || '|' || t8.count
 from
-  t7;
-
---   t8 as (
---     select
---       leagues.league as league,
---       t7.team,
---       t7.count
---     from
---       t7
---       join leagues on t7.league = leagues.lgID
---   )
--- select
---   t8.league || '|' || t8.team || '|' || t8.count
--- from
---   t8
--- order by
---   t8.count desc,
---   t8.team;
+  t9
+order by
+  t9.count desc,
+  t9.team;
