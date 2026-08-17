@@ -15,7 +15,7 @@
 -- tables involved: awardsplayers (for player->award), people, teams, appearances (for batted games)
 */
 with
-  t1 as (
+  players_who_won_gold_glove_and_batted_abv_their_teams_avg as (
     select
       playerID,
       awardID,
@@ -37,9 +37,9 @@ with
               -- this establishes that the playerID from the awardsPlayers that I'm
               -- selecting and the one from the appearances table is the same
               a1.playerID = a2.playerID
-              -- This is how you compare the player's batting average against a single
-              -- scalar value (collapsed from the avg aggregate func) representing
-              -- their team's average
+              -- This is how you compare the player's batting average against
+              -- their team's average (collapsed into a scalar). You just do an
+              -- aggregate which collapses a table into a single value
               and a2.G_batting > (
                 select
                   avg(a3.G_batting)
@@ -62,29 +62,31 @@ from
   -- https://stackoverflow.com/questions/19601948/must-appear-in-the-group-by-clause-or-be-used-in-an-aggregate-function
   (
     select
-      t1.playerID,
-      count(t1.yearID) as c
+      players_who_won_gold_glove_and_batted_abv_their_teams_avg.playerID,
+      count(
+        players_who_won_gold_glove_and_batted_abv_their_teams_avg.yearID
+      ) as c
     from
-      t1
+      players_who_won_gold_glove_and_batted_abv_their_teams_avg
     group by
-      t1.playerID
+      players_who_won_gold_glove_and_batted_abv_their_teams_avg.playerID
   ) tt
   join people t2 on tt.playerID = t2.playerID
-  join t1 on t2.playerID = t1.playerID
-  -- t1 only gives me the players who won Gold Glove and the years they won it, but there's nothing in there
+  join players_who_won_gold_glove_and_batted_abv_their_teams_avg on t2.playerID = players_who_won_gold_glove_and_batted_abv_their_teams_avg.playerID
+  -- players_who_won_gold_glove_and_batted_abv_their_teams_avg only gives me the players who won Gold Glove and the years they won it, but there's nothing in there
   -- that tells me the team they were on when they won it, which I need for the output
   --
   -- This necessitates the bottom join, which answers the q of "which team for this player, year combo".
   -- The issue in doing this without an additional where clause is it'll just give you the records
   -- from appearances irrespective of the (year, player) combo corresponding to the selection criteria.
   --
-  -- It's not an unnecessary operation, you genuinely didn't have access to this in t1 and now you need to join
+  -- It's not an unnecessary operation, you genuinely didn't have access to this in players_who_won_gold_glove_and_batted_abv_their_teams_avg and now you need to join
   -- in order to find it
-  join appearances t3 on t1.playerID = t3.playerID
+  join appearances t3 on players_who_won_gold_glove_and_batted_abv_their_teams_avg.playerID = t3.playerID
 where
   (
-    t1.yearID = t3.yearID
-    and t1.playerID = t3.playerID
+    players_who_won_gold_glove_and_batted_abv_their_teams_avg.yearID = t3.yearID
+    and players_who_won_gold_glove_and_batted_abv_their_teams_avg.playerID = t3.playerID
   )
 order by
   c desc,
@@ -92,4 +94,4 @@ order by
 limit
   10;
 
--- count(t1.yearID) as c
+-- count(players_who_won_gold_glove_and_batted_abv_their_teams_avg.yearID) as c

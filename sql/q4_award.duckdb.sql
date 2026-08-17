@@ -17,67 +17,141 @@ league|team_name|distinct_years
 One of the rows in the output looks like the following:
 
 National League|Atlanta Braves|3
-*/
-/*
 
-Rough sketch:
+1.
+For the event E count of all teams, I need to filter out all teams where
+E has occured less than than twice. Then order by event E count and team name.
 
-Going to need CTEs here. Tables involved —
-awardsplayers correlated against a team, year combo.
-awardsmanagers correlated against the same team, year combo.
-leagues to find the active leagues.
+-- Specifically for part E for players
+I need to group players onto the teams they played on in a year.
 
-Outer table will likely contain all the active leagues from leagues, then
-the year column will correlate against awardsmanagers and awardsplayers
+I need to only keep distinct players that won an award on a (team, year) combination.
 
-Deeper thinking:
+I need to count the number of players that won an award on that (team, year) combination.
+
+I need to keep (team, year) combinations where the count of players that won an award is > 5.
+
+-- Specifically for part E for manager
+I need to track (manager, year) pairs who've won at least 1 award
+
+
+2.
+The grain of my final solution needs to be (league, team, count)
+
+3.
+To find players that played on a team in a year, I can use the appearances table (distinct by player ID, team, and year). I can then
+group by those same attributes.  --> playerID, team, year (t1)
+
+To keep only distinct players, I can add distinct as a keyword so as to not duplicate. Will I lose players who played on multiple teams? No, because the distinct keyword is on all three attributes. You'd lose players if you only made the playerID distinct.
+
+To find the players that won an award on a specific (year, team), I'll join t1 against awardsplayers on player and year. This will keep only the (playerID, team, year) tuples representing players who won awards. (t2)
+
+To find the # of players that won an award on a specific (year, team), I'll group by (team, year) from t2 which'll give me the players that won an award on a (team, year) combo and only keep the groups having count(player) > 5 (t3) --> teamID, yearID. This will effectively be event E, for players, for all (team, year) combos.
+
+-- for managers
+I'll join the managers table against awardsmanagers on distinct (playerID, teamID, yearID). This'll give me the distinct managers that won an award on a (team/year) combo. -> playerID, teamID, yearID (t4). I don't need to count anything for managers, since this is a T/F type check rather than an enumeration check.
+
+I'll then join t3 and t4 on teamID and yearID, which'll give me all of the (team, year) combos where it's players won more than 5 awards and it's manager won an award. -> teamID, yearID (t5)
+
+I'll then project count(team) and group by team and filter teams having count(team) > 1 (t6) -> (count(team), team) from t5
+
+I'll then join t6 against teams to get the leagues, and will then project out (league, team, count(occurences))
+
+
+
+
+
+
 ---------------------------------------------
 
-Break this into a few queries, then define the relations between them.
-
-Firstly, I need a table that, given a team/year pair, can be used to
-answer, as a boolean, did 5 distinct players from the team win an award
-in this year.
-
-Secondly, I need a table that, given a team/year pair, can be used to
-answer, as a boolean, did a manager from the same team as ^ win an award
-in the same year.
-
-The above two consolidate an event, E. The combination of the above two will
-generate a table roughly something like "Count of Instances this has happened, league, team_name"
-which will act as my inner query/table.
-
-The outer query will feed in league IDs that are active from `leagues`, which the
-inner query will then match on against its own league_id and return three-tuple pairs.
-
----------------------------------------------
-
-First I need a table of all awards won by everyone in a given year/league combo. There's no direct way to do that,
-I need to list out all
-
 */
--- This gives the year, league pairs that are currently active
 with
-  active_leagues as (
+  t1 as (
     select distinct
-      ap.yearID,
-      ap.lgID
+      app.playerID,
+      app.teamID,
+      app.yearID
     from
-      awardsplayers as ap
-    where
-      ap.lgID in (
-        select
-          l.lgId
-        from
-          leagues as l
-        where
-          l.active = 'Y'
-      )
+      appearances as app
     group by
-      ap.yearID,
-      ap.lgID
+      app.playerID,
+      app.teamID,
+      app.yearID
+  ),
+  t2 as (
+    select
+      t1.playerID,
+      t1.teamID,
+      t1.yearID
+    from
+      t1
+      join awardsplayers as ap on t1.playerID = ap.playerID
+      and t1.yearID = ap.yearID
+  ),
+  t3 as (
+    select
+      t2.teamID,
+      t2.yearID
+    from
+      t2
+    group by
+      t2.teamID,
+      t2.yearID
+    having
+      count(t2.teamID) > 5
+  ),
+  t4 as (
+    select distinct
+      m.playerID,
+      m.teamID,
+      m.yearID
+    from
+      managers as m
+      join awardsmanagers as am on m.playerID = am.playerID
+      and m.yearID = am.yearID
+  ),
+  t5 as (
+    select
+      t3.teamID,
+      t3.yearID
+    from
+      t3
+      join t4 on t3.teamID = t4.teamID
+      and t3.yearID = t4.yearID
+  ),
+  t6 as (
+    select
+      count(t5.teamID) as c,
+      t5.teamID
+    from
+      t5
+    group by
+      t5.teamID
+    having
+      count(t5.teamID) > 1
+  ),
+  t7 as (
+    select
+      teams.lgID as league,
+      teams.name as team,
+      t6.c as count
+    from
+      t6
+      join teams on t6.teamID = teams.teamID
+  ),
+  t8 as (
+    select
+      leagues.league as league,
+      t7.team,
+      t7.count
+    from
+      t7
+      join leagues on t7.league = leagues.lgID
   )
 select
-  *
+  t8.league || '|' || t8.team || '|' || t8.count
 from
-  active_leagues;
+  t8
+order by
+  t8.count desc,
+  t8.team;
