@@ -112,7 +112,7 @@ with
   ),
   t5 as ( -- Table of (team, year) tuples where players and managers together satisfy event E
     select
-      t3.teamID as team,
+      t3.teamID,
       t3.yearID as year
     from
       t3
@@ -121,33 +121,29 @@ with
   ),
   t6 as ( -- Table of (team, count(team)) tuples where E has occured more than once
     select
-      t5.team as team,
-      count(t5.team) as c
+      t5.teamID,
+      count(*) as c
     from
       t5
     group by
-      t5.team
-      -- having
-      --   count(t5.year) > 1
+      t5.teamID
+    having
+      count(*) > 1
+  ),
+  t7 as ( -- the join fanout that's occuring here is because the `teams` table has a row for each year a team player, not a static list of teams
+    select
+      teams.lgID as league,
+      teams.name as teamName,
+      t6.c as count
+    from
+      t6
+      join teams on t6.teamID = teams.teamID
   )
 select
-  t6.team,
-  t6.c
+  *
 from
-  t6
-order by
-  t6.c desc,
-  t6.team;
+  t7;
 
---   t7 as (
---     select
---       teams.lgID as league,
---       teams.name as team,
---       t6.c as count
---     from
---       t6
---       join teams on t6.teamID = teams.teamID
---   ),
 --   t8 as (
 --     select
 --       leagues.league as league,
