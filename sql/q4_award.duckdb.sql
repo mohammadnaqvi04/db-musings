@@ -66,7 +66,7 @@ I'll then join t6 against teams to get the leagues, and will then project out (l
 
 */
 with
-  t1 as (
+  t1 as ( --  the table of distinct players grouped by (ID, team, year)
     select distinct
       app.playerID,
       app.teamID,
@@ -78,8 +78,8 @@ with
       app.teamID,
       app.yearID
   ),
-  t2 as (
-    select
+  t2 as ( -- table of the distinct (player, team, year) tuples that won an award
+    select distinct
       t1.playerID,
       t1.teamID,
       t1.yearID
@@ -88,8 +88,8 @@ with
       join awardsplayers as ap on t1.playerID = ap.playerID
       and t1.yearID = ap.yearID
   ),
-  t3 as (
-    select
+  t3 as ( -- table of distinct (team, year) tuples where > 5 players won an award
+    select distinct
       t2.teamID,
       t2.yearID
     from
@@ -100,7 +100,7 @@ with
     having
       count(t2.teamID) > 5
   ),
-  t4 as (
+  t4 as ( -- table of distinct (manager, team, year) tuples where a manager won an award
     select distinct
       m.playerID,
       m.teamID,
@@ -110,48 +110,57 @@ with
       join awardsmanagers as am on m.playerID = am.playerID
       and m.yearID = am.yearID
   ),
-  t5 as (
+  t5 as ( -- Table of (team, year) tuples where players and managers together satisfy event E
     select
-      t3.teamID,
-      t3.yearID
+      t3.teamID as team,
+      t3.yearID as year
     from
       t3
       join t4 on t3.teamID = t4.teamID
       and t3.yearID = t4.yearID
   ),
-  t6 as (
+  t6 as ( -- Table of (team, count(team)) tuples where E has occured more than once
     select
-      count(t5.teamID) as c,
-      t5.teamID
+      t5.team as team,
+      count(t5.team) as c
     from
       t5
     group by
-      t5.teamID
-    having
-      count(t5.teamID) > 1
-  ),
-  t7 as (
-    select
-      teams.lgID as league,
-      teams.name as team,
-      t6.c as count
-    from
-      t6
-      join teams on t6.teamID = teams.teamID
-  ),
-  t8 as (
-    select
-      leagues.league as league,
-      t7.team,
-      t7.count
-    from
-      t7
-      join leagues on t7.league = leagues.lgID
+      t5.team
+      -- having
+      --   count(t5.year) > 1
   )
 select
-  t8.league || '|' || t8.team || '|' || t8.count
+  t6.team,
+  t6.c
 from
-  t8
+  t6
 order by
-  t8.count desc,
-  t8.team;
+  t6.c desc,
+  t6.team;
+
+--   t7 as (
+--     select
+--       teams.lgID as league,
+--       teams.name as team,
+--       t6.c as count
+--     from
+--       t6
+--       join teams on t6.teamID = teams.teamID
+--   ),
+--   t8 as (
+--     select
+--       leagues.league as league,
+--       t7.team,
+--       t7.count
+--     from
+--       t7
+--       join leagues on t7.league = leagues.lgID
+--   )
+-- select
+--   t8.league || '|' || t8.team || '|' || t8.count
+-- from
+--   t8
+-- order by
+--   t8.count desc,
+--   t8.team;
