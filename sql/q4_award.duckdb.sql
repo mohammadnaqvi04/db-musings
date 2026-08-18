@@ -94,33 +94,40 @@ with
       app.teamID,
       app.yearID
   ),
-  t2 as ( -- table of the distinct (team, year) tuples representing a player that won an award
+  tt as ( -- (playerID, awardID, teamID, yearID). This table serves to mitigate the fanning I suspect is ruining downstream
+    -- tables. This is the table of players grouped by their unique
     select
-      t1.teamID,
-      t1.yearID,
-      -- count(t1.yearID)
+      dis
+  ),
+  t2 as ( -- table of distinct (teamID, year) tuples where > 5 players won an award
+    select
+      tt.teamID,
+      tt.yearID,
+      count(tt.yearID) as count
     from
       t1
-      -- I believe the way I have this, it's fanning out on 1 playerID in a year having multiple awards.
-      -- The way to limit would be to group by team and year
-      join awardsplayers as ap on t1.playerID = ap.playerID
-      and t1.yearID = ap.yearID
-      -- This should collapse the tuples sharing a (team, year) tuples into one row.
-      -- But putting a group by here essentially means I'm losing the cardinality
-      -- of the # of award winning players per (team, year) combination. Including
-      -- this makes t6 go to 0.
-      -- group by
-      --   t1.teamID,
-      --   t1.yearID
+      -- I believe the way I have this, it's fanning out on 1 (playerID, year) combination having multiple awards.
+      join awardsplayers as ap on tt.playerID = ap.playerID
+      and tt.yearID = ap.yearID
+      and tt.awardID = ap.awardID
+      -- This should collapse the tuples sharing a (team, year) tuples into one row. I've already counted
+      -- the # of (team, year) rows per group
+    group by
+      tt.teamID,
+      tt.yearID
+    order by
+      tt.teamID,
+      tt.yearID
   ),
-  t3 as ( -- table of distinct (teamID, year) tuples where > 5 players won an award
+  t3 as ( -- Table with all (team, year) tuples with less than an event count of E filtered out
     select
       t2.teamID,
       t2.yearID
     from
       t2
     where
-      t2.teamID not in (
+      t2.count > 5
+      and t2.teamID not in (
         select
           teamID
         from
@@ -138,14 +145,12 @@ with
     group by
       t2.teamID,
       t2.yearID
-    having
-      count(t2.yearID) > 5
     order by
       t2.teamID,
       t2.yearID
   ),
-  t4 as ( -- table of distinct (manager, team, year) tuples where a manager won an award
-    select
+  t4 as ( -- table of distinct (team, year) tuples where a manager won an award
+    select distinct
       m.teamID,
       m.yearID
     from
@@ -171,6 +176,9 @@ with
     group by
       m.teamID,
       m.yearID
+    order by
+      m.teamID,
+      m.yearID
   ),
   t5 as ( -- Table of (team, year) tuples where players and managers together satisfy event E
     select
@@ -181,7 +189,8 @@ with
       join t4 on t3.teamID = t4.teamID
       and t3.yearID = t4.yearID
     where
-      t3.teamID not in (
+      t3.teamID = 'ATL'
+      and t3.teamID not in (
         select
           teamID
         from
@@ -224,6 +233,9 @@ with
       t5.teamID
     having
       count(*) > 1
+    order by
+      t5.teamID,
+      count(*)
   ),
   t7 as ( -- Table of (teamID, name, year) tuples to map from teamID to name
     select distinct
@@ -268,9 +280,7 @@ with
 select
   *
 from
-  t3
-where
-  teamID = 'ATL';
+  t2;
 
 -- select
 --   t9.league || '|' || t9.team || '|' || t9.count
