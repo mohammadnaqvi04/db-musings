@@ -66,6 +66,20 @@ I'll then join t6 against teams to get the leagues, and will then project out (l
 
 */
 with
+  verifier_1 as (
+    select
+      app.playerID,
+      app.teamID,
+      app.yearID
+    from
+      appearances as app
+    group by
+      app.playerID,
+      app.teamID,
+      app.yearID
+    having
+      count(*) > 1
+  ),
   t1 as ( -- the table of players grouped by distinct (team, year) tuples
     select distinct
       app.playerID,
@@ -94,30 +108,41 @@ with
       app.teamID,
       app.yearID
   ),
-  tt as ( -- (playerID, awardID, teamID, yearID). This table serves to mitigate the fanning I suspect is ruining downstream
-    -- tables. This is the table of players grouped by their unique
+  verifier_2 as (
     select
-      dis
+      t1.playerID,
+      t1.yearID
+    from
+      t1
+    where
+      playerID = 'abadfe01'
+      -- group by
+      --   t1.playerID,
+      --   t1.yearID
+      -- having
+      --   count(*) > 1
+    order by
+      t1.playerID,
+      t1.yearID
   ),
   t2 as ( -- table of distinct (teamID, year) tuples where > 5 players won an award
     select
-      tt.teamID,
-      tt.yearID,
-      count(tt.yearID) as count
+      t1.teamID,
+      t1.yearID,
+      count(t1.yearID) as count
     from
       t1
       -- I believe the way I have this, it's fanning out on 1 (playerID, year) combination having multiple awards.
-      join awardsplayers as ap on tt.playerID = ap.playerID
-      and tt.yearID = ap.yearID
-      and tt.awardID = ap.awardID
+      join awardsplayers as ap on t1.playerID = ap.playerID
+      and t1.yearID = ap.yearID
       -- This should collapse the tuples sharing a (team, year) tuples into one row. I've already counted
       -- the # of (team, year) rows per group
     group by
-      tt.teamID,
-      tt.yearID
+      t1.teamID,
+      t1.yearID
     order by
-      tt.teamID,
-      tt.yearID
+      t1.teamID,
+      t1.yearID
   ),
   t3 as ( -- Table with all (team, year) tuples with less than an event count of E filtered out
     select
@@ -280,7 +305,7 @@ with
 select
   *
 from
-  t2;
+  verifier_2;
 
 -- select
 --   t9.league || '|' || t9.team || '|' || t9.count
