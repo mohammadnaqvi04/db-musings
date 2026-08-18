@@ -66,63 +66,86 @@ I'll then join t6 against teams to get the leagues, and will then project out (l
 
 */
 with
-  active_leagues as ( -- table of active leagues
-    select
-      lgID
-    from
-      leagues
-    where
-      active = 'T'
-  ),
-  active_teams as ( -- You needed these to prevent the join fanout from before
-    select
-      teamID
-    from
-      teams,
-      active_leagues
-    where
-      teams.lgID in active_leagues
-  ),
-  t1 as ( --  the table of distinct players grouped by (ID, team, year)
+  t1 as ( -- the table of players grouped by distinct (team, year) tuples
     select distinct
       app.playerID,
       app.teamID,
       app.yearID
     from
-      appearances as app,
-      active_teams
+      appearances as app
     where
-      app.teamID in active_teams
+      app.teamID not in (
+        select
+          teamID
+        from
+          teams
+        where
+          teams.lgID in (
+            select
+              lgID
+            from
+              leagues
+            where
+              active = 'N'
+          )
+      )
     group by
       app.playerID,
       app.teamID,
       app.yearID
   ),
-  t2 as ( -- table of the distinct (player, team, year) tuples that won an award
-    select distinct
-      t1.playerID,
+  t2 as ( -- table of the distinct (team, year) tuples representing a player that won an award
+    select
       t1.teamID,
-      t1.yearID
+      t1.yearID,
+      -- count(t1.yearID)
     from
       t1
+      -- I believe the way I have this, it's fanning out on 1 playerID in a year having multiple awards.
+      -- The way to limit would be to group by team and year
       join awardsplayers as ap on t1.playerID = ap.playerID
       and t1.yearID = ap.yearID
+      -- This should collapse the tuples sharing a (team, year) tuples into one row.
+      -- But putting a group by here essentially means I'm losing the cardinality
+      -- of the # of award winning players per (team, year) combination. Including
+      -- this makes t6 go to 0.
+      -- group by
+      --   t1.teamID,
+      --   t1.yearID
   ),
-  t3 as ( -- table of distinct (team, year) tuples where > 5 players won an award
-    select distinct
+  t3 as ( -- table of distinct (teamID, year) tuples where > 5 players won an award
+    select
       t2.teamID,
       t2.yearID
     from
       t2
+    where
+      t2.teamID not in (
+        select
+          teamID
+        from
+          teams
+        where
+          teams.lgID in (
+            select
+              lgID
+            from
+              leagues
+            where
+              leagues.active = 'N'
+          )
+      )
     group by
       t2.teamID,
       t2.yearID
     having
-      count(t2.teamID) > 5
+      count(t2.yearID) > 5
+    order by
+      t2.teamID,
+      t2.yearID
   ),
   t4 as ( -- table of distinct (manager, team, year) tuples where a manager won an award
-    select distinct
-      m.playerID,
+    select
       m.teamID,
       m.yearID
     from
@@ -130,7 +153,24 @@ with
       join awardsmanagers as am on m.playerID = am.playerID
       and m.yearID = am.yearID
     where
-      m.teamID in active_leagues
+      m.teamID not in (
+        select
+          teamID
+        from
+          teams
+        where
+          teams.lgID in (
+            select
+              lgID
+            from
+              leagues
+            where
+              leagues.active = 'N'
+          )
+      )
+    group by
+      m.teamID,
+      m.yearID
   ),
   t5 as ( -- Table of (team, year) tuples where players and managers together satisfy event E
     select
@@ -140,13 +180,46 @@ with
       t3
       join t4 on t3.teamID = t4.teamID
       and t3.yearID = t4.yearID
+    where
+      t3.teamID not in (
+        select
+          teamID
+        from
+          teams
+        where
+          teams.lgID in (
+            select
+              lgID
+            from
+              leagues
+            where
+              leagues.active = 'N'
+          )
+      )
   ),
+  -- BUG EXISTS BEFORE HERE (counting teams/years that shouldnt count)
   t6 as ( -- Table of (team, count(team)) tuples where E has occured more than once
     select
       t5.teamID,
       count(*) as c
     from
       t5
+    where
+      t5.teamID not in (
+        select
+          teamID
+        from
+          teams
+        where
+          teams.lgID in (
+            select
+              lgID
+            from
+              leagues
+            where
+              leagues.active = 'N'
+          )
+      )
     group by
       t5.teamID
     having
@@ -156,14 +229,27 @@ with
     select distinct
       teamID,
       name,
-      yearID
     from
       teams
     where
-      teamID in active_leagues
+      teamID not in (
+        select
+          teamID
+        from
+          teams
+        where
+          teams.lgID in (
+            select
+              lgID
+            from
+              leagues
+            where
+              active = 'N'
+          )
+      )
   ),
   t8 as ( -- Table of (team_name, count(event E)) tuples
-    select
+    select distinct
       t7.name,
       t6.c as count
     from
@@ -172,17 +258,24 @@ with
   ),
   t9 as ( -- Final output
     select
-      leagues.league as league,
-      t8.name,
+      leagues.league as league_name,
+      t8.name as team,
       t8.count
     from
       t8
-      join leagues on t7.league = leagues.lgID
+      join leagues on t8.name = leagues.league
   )
 select
-  t8.league || '|' || t8.team || '|' || t8.count
+  *
 from
-  t9
-order by
-  t9.count desc,
-  t9.team;
+  t3
+where
+  teamID = 'ATL';
+
+-- select
+--   t9.league || '|' || t9.team || '|' || t9.count
+-- from
+--   t9
+-- order by
+--   t9.count desc,
+--   t9.team;
