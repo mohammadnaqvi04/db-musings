@@ -66,14 +66,27 @@ I'll then join t6 against teams to get the leagues, and will then project out (l
 
 */
 with
-  t1 as ( -- the table of distinct (player, team, league, year) tuples
+  t0 as ( -- the table of distinct teams (teamID, league, name, year)
+    select distinct
+      teamID,
+      lgID,
+      name,
+      yearID
+    from
+      teams
+  ),
+  t1 as ( -- the table of distinct (player, team, league, name, year) tuples
     select distinct
       app.playerID,
       app.teamID,
       app.lgID,
+      t0.name,
       app.yearID
     from
       appearances as app
+      join t0 on app.teamID = t0.teamID
+      and app.lgID = t0.lgID
+      and app.yearID = t0.yearID
     where
       app.teamID not in (
         select distinct
@@ -90,18 +103,13 @@ with
               active = 'N'
           )
       )
-    group by
-      app.playerID,
-      app.teamID,
-      app.lgID,
-      app.yearID
   ),
-  -- what if instead of player up above I just went down to (team, year) by reverse engineering the player back to his team at the time?
-  ttemp as ( -- table of distinct (player, team, league, year) tuples
+  ttemp as ( -- table of distinct (player, team, league, name, year) tuples
     select distinct
       ap.playerID,
       t1.teamID,
       t1.lgID,
+      t1.name,
       ap.yearID
     from
       awardsplayers ap
@@ -109,34 +117,30 @@ with
       and ap.yearID = t1.yearID
       and ap.lgID = t1.lgID
   ),
-  tl as ( -- the distinct (player, team, league, year) tuples that won an award
-    -- ATTENTION: Made this back into a table of (player, team, year) to account for a player who played for 2 teams in the same year
-    -- Need to try the same granularity reduction now... Does contain BOS, BAL, CLE.
+  tl as ( -- the distinct (player, team, league, name, year) tuples that won an award
     select distinct
       ttemp.playerID,
       t1.teamID,
       t1.lgID,
+      t1.name,
       ttemp.yearID
     from
       ttemp
       join t1 on ttemp.playerID = t1.playerID
       and ttemp.teamID = t1.teamID
       and ttemp.lgID = t1.lgID
+      and ttemp.name = t1.name
       and ttemp.yearID = t1.yearID
     order by
       t1.teamID,
       ttemp.yearID
   ),
-  tt as ( -- the distinct (team, league, year) tuples representing an award winning team
+  tt as ( -- the distinct (team, league, name, year) tuples representing an award winning team
     -- table of distinct (teamID, year) tuples where > 5 players won an award
-    -- the goal here is to reduce the granularity of awardsplayers from 1 row per award to match t1's granularity—
-    -- (1 row per distinct (team, year) tuple). I need granularity: 1 row per team, year combo
-    -- This is supposed to be a granularity of (team, year, # of awards in this year for this team)
-    --
-    -- -- ATTENTION: not enough, might've switched to a different team on the same league. Does not contain BOS, BAL, CLE.
     select
       tl.teamID,
       tl.lgID,
+      tl.name,
       tl.yearID,
       count(*)
     from
@@ -144,31 +148,39 @@ with
     group by
       tl.teamID,
       tl.lgID,
+      tl.name,
       tl.yearID
     having
       count(*) > 5
     order by
       tl.teamID,
       tl.lgID,
+      tl.name,
       tl.yearID
   ),
-  tr as ( -- the distinct (manager, team, league, year) tuples
+  tr as ( -- the distinct (manager, team, league, name, year) tuples
     select
       m.playerID,
       m.teamID,
       m.lgID,
+      t0.name,
       m.yearID
     from
       managers m
+      join t0 on m.teamID = t0.teamID
+      and m.lgID = t0.lgID
+      and m.yearID = t0.yearID
     group by
       m.playerID,
       m.teamID,
       m.lgID,
+      t0.name,
       m.yearID
     order by
       m.playerID,
       m.teamID,
       m.lgID,
+      t0.name,
       m.yearID
   ),
   tq as ( -- the distinct (manager, team, league, year) tuples that won an award
@@ -176,6 +188,7 @@ with
       am.playerID,
       tr.teamID,
       tr.lgID,
+      tr.name,
       am.yearID
     from
       awardsmanagers am
@@ -186,16 +199,19 @@ with
       am.playerID,
       tr.teamID,
       tr.lgID,
+      tr.name,
       am.yearID
     order by
       tr.teamID,
       tr.lgID,
+      tr.name,
       am.yearID
   ),
   t4 as ( -- table of distinct (team, league, year) tuples where a manager won an award
     select distinct
       tq.teamID,
       tq.lgID,
+      tq.name,
       tq.yearID
     from
       tq
@@ -218,14 +234,17 @@ with
     group by
       tq.teamID,
       tq.lgID,
+      tq.name,
       tq.yearID
     order by
       tq.teamID,
       tq.lgID,
+      tq.name,
       tq.yearID
   ),
   t5 as ( -- Table of (team, league, year) tuples where players and managers together satisfy event E
     select distinct
+      tt.name,
       tt.teamID,
       tt.lgID,
       tt.yearID
@@ -233,6 +252,7 @@ with
       tt
       join t4 on tt.teamID = t4.teamID
       and tt.lgID = t4.lgID
+      and tt.name = t4.name
       and tt.yearID = t4.yearID
     where
       tt.teamID not in (
@@ -255,11 +275,11 @@ with
       tt.lgID,
       tt.yearID
   ),
-  -- BUG EXISTS BEFORE HERE (counting teams/years that shouldnt count)
-  t6 as ( -- Table of (team, count(team)) tuples where E has occured more than once
+  t6 as ( -- Table of (teamID, leagueID, team name, count(team)) tuples where E has occured more than once
     select
       t5.teamID,
       t5.lgID,
+      t5.name as team_name,
       count(*) as c
     from
       t5
@@ -281,58 +301,58 @@ with
       )
     group by
       t5.teamID,
-      t5.lgID
+      t5.lgID,
+      t5.name
     having
       count(*) > 1
     order by
       c desc,
       t5.teamID,
-      t5.lgID
+      t5.lgID,
+      t5.name
   ),
-  t7 as ( -- Table of (teamID, name, year) tuples to map from teamID to name
+  t7 as ( -- Table of distinct (teamID, leagueID, league name, team name, year) tuples from teams
     select distinct
-      teamID,
-      name
+      teams.teamID,
+      leagues.lgID,
+      leagues.league as league_name,
+      teams.name as team_name
     from
       teams
+      join leagues on teams.lgID = leagues.lgID
     where
-      teamID not in (
+      leagues.lgID not in (
         select
-          teamID
+          lgID
         from
-          teams
+          leagues
         where
-          teams.lgID in (
-            select
-              lgID
-            from
-              leagues
-            where
-              active = 'N'
-          )
+          active = 'N'
+      )
+      and teams.lgID not in (
+        select
+          lgID
+        from
+          leagues
+        where
+          active = 'N'
       )
   ),
-  t8 as ( -- Table of (team_name, count(event E)) tuples
+  t8 as ( -- Table of (league name, team name, count(event E)) tuples
     select distinct
-      t7.name,
-      t6.c as count
+      t7.league_name,
+      t7.team_name,
+      t6.c as distinct_years
     from
       t6
       join t7 on t6.teamID = t7.teamID
-  ),
-  t9 as ( -- Final output
-    select distinct
-      leagues.league as league_name,
-      t8.name as team,
-      t8.count
-    from
-      t8
-      join teams on t8.name = teams.name
-      join leagues on teams.lgID = leagues.lgID
+      and t6.lgID = t7.lgID
+      and t6.team_name = t7.team_name
+    order by
+      distinct_years desc,
+      t7.team_name
   )
 select
   *
 from
-  t6;
-
--- atlanta, chicago, bal, bos, cle, new york (minnesota and philly are wrongfully included.)
+  t8;
